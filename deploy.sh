@@ -122,6 +122,15 @@ install_pm2() {
 setup_project() {
     log_step "部署项目"
 
+    # 如果当前就在目标目录，直接就地部署
+    if [ "$SCRIPT_DIR" = "$APP_DIR" ]; then
+        log_info "当前已在项目目录，就地部署..."
+        rm -rf "$APP_DIR/node_modules" "$APP_DIR/.git"
+        cd "$APP_DIR"
+        install_deps_and_build
+        return
+    fi
+
     if [ -d "$APP_DIR" ]; then
         log_warn "项目目录已存在: $APP_DIR"
         read -p "是否覆盖? [y/N]: " choice
@@ -137,58 +146,34 @@ setup_project() {
 
     mkdir -p "$APP_DIR"
 
-    # 查找并复制项目文件
-    local found=false
-
-    # 情况1: 当前目录就是项目根目录
+    # 从脚本目录复制
     if [ -f "$SCRIPT_DIR/package.json" ] && [ -f "$SCRIPT_DIR/server.js" ]; then
-        log_info "从脚本所在目录复制..."
+        log_info "复制项目文件..."
         cp -r "$SCRIPT_DIR"/* "$APP_DIR/" 2>/dev/null || true
         cp -r "$SCRIPT_DIR"/.* "$APP_DIR/" 2>/dev/null || true
-        found=true
-    fi
-
-    # 情况2: 当前目录下有 fengfeng-runner 子目录
-    if [ ! -f "$APP_DIR/package.json" ] && [ -d "$SCRIPT_DIR/fengfeng-runner" ]; then
-        log_info "从 fengfeng-runner 子目录复制..."
-        cp -r "$SCRIPT_DIR/fengfeng-runner"/* "$APP_DIR/" 2>/dev/null || true
-        found=true
-    fi
-
-    # 情况3: 当前目录下有 dist 和 server.js
-    if [ ! -f "$APP_DIR/package.json" ] && [ -f "$SCRIPT_DIR/dist/index.html" ]; then
-        log_info "从当前目录复制..."
-        cp "$SCRIPT_DIR"/server.js "$APP_DIR/" 2>/dev/null || true
-        cp "$SCRIPT_DIR"/db.js "$APP_DIR/" 2>/dev/null || true
-        cp "$SCRIPT_DIR"/package*.json "$APP_DIR/" 2>/dev/null || true
-        cp "$SCRIPT_DIR"/deploy.sh "$APP_DIR/" 2>/dev/null || true
-        cp -r "$SCRIPT_DIR"/dist "$APP_DIR/" 2>/dev/null || true
-        found=true
-    fi
-
-    if [ ! -f "$APP_DIR/package.json" ]; then
-        log_error "未找到项目文件"
-        log_info "请确保目录中有 package.json 和 server.js"
-        log_info "当前目录内容:"
+    else
+        log_error "未找到项目文件（package.json, server.js）"
         ls -la "$SCRIPT_DIR"
         exit 1
     fi
 
     cd "$APP_DIR"
     rm -rf "$APP_DIR/node_modules" "$APP_DIR/.git"
+    install_deps_and_build
+}
 
+install_deps_and_build() {
     log_info "安装依赖..."
     npm install --registry https://registry.npmmirror.com
 
-    # 如果已有 dist 目录则跳过构建
-    if [ -d "$APP_DIR/dist" ] && [ -f "$APP_DIR/dist/index.html" ]; then
-        log_info "已存在 dist 目录，跳过构建"
+    if [ -d "dist" ] && [ -f "dist/index.html" ]; then
+        log_info "已存在 dist，跳过构建"
     else
         log_info "构建前端..."
         npm run build
     fi
 
-    if [ ! -d "$APP_DIR/dist" ]; then
+    if [ ! -d "dist" ]; then
         log_error "构建失败"
         exit 1
     fi
