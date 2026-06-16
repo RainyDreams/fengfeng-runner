@@ -1,0 +1,8 @@
+name = "fengfeng-runner"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "./dist"
+
+[[kv_namespaces]]
+binding = "SCORES_KV"
+id = "your_kv_namespace_id"
+preview_id = "your_preview_kv_namespace_id"
